@@ -542,6 +542,29 @@ def run_daily(
         force_medium_update=True,
     )
  
+    # ---- Enforce portfolio constraints (match backtest behavior) ----
+    # Step 1: Remove de minimis allocations (< 2%)
+    final_weights = {k: v for k, v in final_weights.items() if v >= 0.02 or k == "SHY"}
+
+    # Step 2: Renormalize
+    total = sum(final_weights.values())
+    if total > 0:
+        final_weights = {k: v / total for k, v in final_weights.items()}
+
+    # Step 3: If still above 12 assets, remove lowest until at cap
+    MAX_PORTFOLIO_SIZE = 12
+    while len(final_weights) > MAX_PORTFOLIO_SIZE:
+        # Find lowest weight asset (never remove SHY)
+        removable = {k: v for k, v in final_weights.items() if k != "SHY"}
+        if not removable:
+            break
+        lowest = min(removable, key=removable.get)
+        del final_weights[lowest]
+        # Renormalize
+        total = sum(final_weights.values())
+        if total > 0:
+            final_weights = {k: v / total for k, v in final_weights.items()}
+
     # ---- Build signal with attribution ----
     latest_state = state.iloc[-1]
  

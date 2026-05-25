@@ -1,0 +1,69 @@
+{
+  "v8_full_pipeline": {
+    "label": "Multi-Horizon",
+    "sharpe": 1.7626433177349365,
+    "cagr": 0.17738052415252792,
+    "max_dd": -0.11534078635243526,
+    "sortino": 2.3662441036664354,
+    "calmar": 1.5378820429620106,
+    "vol": 0.09524398795036672,
+    "kurtosis": 2.7208620791563094,
+    "n_days": 2853
+  },
+  "allocator_only": {
+    "label": "Allocator Only",
+    "sharpe": 1.5759759353341183,
+    "cagr": 0.15594567067963538,
+    "max_dd": -0.18124087444156406,
+    "sortino": 1.9039392220203457,
+    "calmar": 0.8604332282115291,
+    "vol": 0.09484045273636316,
+    "kurtosis": 9.800033763985653,
+    "n_days": 2853
+  },
+  "equal_weight": {
+    "label": "Equal-Weight",
+    "sharpe": 1.6736318828216723,
+    "cagr": 0.15449447578940267,
+    "max_dd": -0.14408199536143135,
+    "sortino": 2.111195191264395,
+    "calmar": 1.0722677417247832,
+    "vol": 0.08818841926297627,
+    "kurtosis": 7.043798355837933,
+    "n_days": 2853
+  },
+  "spy_benchmark": {
+    "label": "SPY Benchmark",
+    "sharpe": 0.8327814142952253,
+    "cagr": 0.14051472660178832,
+    "max_dd": -0.33717277905478,
+    "sortino": 1.0169655639104749,
+    "calmar": 0.41674398210823266,
+    "vol": 0.17671555983514356,
+    "kurtosis": 14.139345717459893,
+    "n_days": 2853
+  },
+  "slow_posture_distribution": {
+    "aggressive": 2045,
+    "balanced": 608,
+    "defensive": 200
+  },
+  "fast_override_rate": 0.1167192429022082,
+  "fast_override_days": 333,
+  "allocator_capital_weights": {
+    "regime_allocator": {
+      "mean": 0.3281296702423012,
+      "std": 0.10467093919678697
+    },
+    "trend_cta": {
+      "mean": 0.3466459099438698,
+      "std": 0.09199456408081776
+    },
+    "defensive": {
+      "mean": 0.3252244198138291,
+      "std": 0.12440724256545811
+    }
+  },
+  "snapshot_used": "baseline_v7",
+  "extended_snapshot_used": "baseline_v7_extended"
+}

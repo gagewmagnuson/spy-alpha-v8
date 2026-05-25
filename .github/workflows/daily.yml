@@ -1,0 +1,37 @@
+name: Daily Signal
+
+on:
+  repository_dispatch:
+    types: [daily-signal]
+  workflow_dispatch:
+
+jobs:
+  daily-signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install numpy pandas scikit-learn hmmlearn yfinance matplotlib pyarrow scipy fredapi lightgbm
+
+      - name: Run daily pipeline
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python3 spy_alpha_v8.py --fred-key $FRED_API_KEY daily --snapshot baseline_v7
+
+      - name: Commit signals and prediction history
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add signals/ 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "Daily signal: $(date +'%Y-%m-%d %H:%M UTC')"
+          git push

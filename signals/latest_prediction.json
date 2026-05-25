@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "generated_at": "2026-05-25T17:04:39.076444+00:00",
+=======
+  "generated_at": "2026-05-25T02:38:54.108353+00:00",
+>>>>>>> b7a2cdba3cab4aee1b2bdd29f6d015f24065113b
   "forecast_date": "2026-05-22",
   "state_assessment": {
     "volatility_regime": "normal_vol",
@@ -60,6 +64,7 @@
       "CAT"
     ],
     "weights": {
+<<<<<<< HEAD
       "SHY": 0.2993,
       "SPY": 0.1111,
       "XLF": 0.0852,
@@ -78,6 +83,26 @@
     "shy_weight": 0.2993,
     "tlt_weight": 0,
     "gld_weight": 0.0431
+=======
+      "SHY": 0.3806,
+      "SPY": 0.091,
+      "XLF": 0.0719,
+      "QQQ": 0.0655,
+      "XLK": 0.0655,
+      "IWM": 0.0583,
+      "XLE": 0.0493,
+      "VWO": 0.0479,
+      "SMH": 0.0456,
+      "GLD": 0.0448,
+      "AMZN": 0.0406,
+      "CAT": 0.039
+    },
+    "n_assets": 12,
+    "upro_weight": 0,
+    "shy_weight": 0.3806,
+    "tlt_weight": 0,
+    "gld_weight": 0.0448
+>>>>>>> b7a2cdba3cab4aee1b2bdd29f6d015f24065113b
   },
   "attribution": {
     "regime_allocator_contribution": "35%",

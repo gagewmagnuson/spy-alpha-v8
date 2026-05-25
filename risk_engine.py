@@ -447,7 +447,12 @@ class RiskEngine:
         weights = self._apply_uncertainty_dampening(
             proposed_weights, uncertainty, active
         )
- 
+
+        # ---- Step 3b: Apply leverage scaling ----
+        weights = self._apply_leverage_scaling(
+            weights, uncertainty, stress_score, active
+        )
+
         # ---- Step 4: Enforce hard constraints ----
         weights = self._enforce_constraints(weights, active)
  
@@ -495,18 +500,20 @@ class RiskEngine:
             - Increase cash/SHY allocation
             - Shift trust toward observable states (implicit via constraint tightening)
         """
-        if uncertainty < 0.2:
-            # Low uncertainty — minimal dampening
+        if uncertainty < 0.4:
+            # Below 0.4 uncertainty — no dampening needed
+            # The risk engine, circuit breakers, and fast layer provide
+            # sufficient protection at normal uncertainty levels
             return weights.copy()
  
         dampened = weights.copy()
  
         # ---- Scale factor: how much to dampen ----
-        # 0.2 uncertainty → 0% dampening
-        # 0.5 uncertainty → 37.5% dampening
-        # 0.8 uncertainty → 75% dampening
+        # 0.4 uncertainty → 0% dampening
+        # 0.6 uncertainty → 33% dampening
+        # 0.8 uncertainty → 67% dampening
         # 1.0 uncertainty → 100% dampening
-        dampen_intensity = (uncertainty - 0.2) / 0.8
+        dampen_intensity = (uncertainty - 0.4) / 0.6
         dampen_intensity = min(max(dampen_intensity, 0), 1.0)
  
         # ---- Reduce UPRO proportionally ----
@@ -519,14 +526,14 @@ class RiskEngine:
             n_assets = len(dampened)
             equal_w = 1.0 / n_assets
  
-            blend_toward_equal = dampen_intensity * 0.4  # at max, blend 40% toward equal
- 
+            blend_toward_equal = dampen_intensity * 0.20  # at max, blend 20% toward equal
+
             for asset in dampened:
                 current = dampened[asset]
                 dampened[asset] = current * (1 - blend_toward_equal) + equal_w * blend_toward_equal
- 
+
         # ---- Increase SHY allocation ----
-        shy_boost = dampen_intensity * 0.15  # at max uncertainty, add 15% SHY
+        shy_boost = dampen_intensity * 0.08  # at max uncertainty, add 8% SHY
         dampened["SHY"] = dampened.get("SHY", 0) + shy_boost
  
         return dampened
@@ -601,6 +608,75 @@ class RiskEngine:
  
         return max(base, 0.5)
  
+    def _apply_leverage_scaling(
+        self,
+        weights: Dict[str, float],
+        uncertainty: float,
+        stress_score: float,
+        active_constraints: Dict[str, Any],
+    ) -> Dict[str, float]:
+        """
+        Scale UPRO allocation based on risk conditions.
+
+        When conditions are favorable (low uncertainty, low stress,
+        no circuit breakers), scale up UPRO toward the constraint ceiling.
+        This replaces v7's label-driven UPRO sizing with a risk-condition-driven
+        approach that doesn't depend on regime names.
+
+        The risk engine controls leverage, not the strategies.
+        """
+        scaled = weights.copy()
+
+        # Only scale UPRO if it exists in the portfolio
+        if "UPRO" not in scaled or scaled["UPRO"] < 0.001:
+            return scaled
+
+        # ---- Conditions for leverage scaling ----
+        # All must be favorable for full scaling
+        conditions_met = (
+            uncertainty < 0.4
+            and stress_score < 0.35
+        )
+
+        if not conditions_met:
+            return scaled
+
+        # ---- Compute scaling intensity ----
+        # Lower uncertainty and stress → more aggressive scaling
+        # uncertainty 0.0 → full scaling, 0.4 → no scaling
+        unc_factor = 1.0 - (uncertainty / 0.4)
+        stress_factor = 1.0 - (stress_score / 0.35)
+        intensity = min(unc_factor, stress_factor)
+        intensity = max(intensity, 0)
+
+        # ---- Target UPRO weight ----
+        # Scale from current weight toward a target based on intensity
+        # At full intensity, target is the constraint ceiling * 0.6
+        max_upro = active_constraints.get("max_upro_weight", 0.45)
+        target_upro = max_upro * 0.6 * intensity  # max ~27% at full intensity
+
+        # Only scale UP, never down
+        if target_upro > scaled["UPRO"]:
+            # Blend toward target — don't jump there
+            blend = 0.5  # 50% of the way toward target
+            new_upro = scaled["UPRO"] + blend * (target_upro - scaled["UPRO"])
+            upro_increase = new_upro - scaled["UPRO"]
+
+            scaled["UPRO"] = new_upro
+
+            # Reduce SHY proportionally to fund the UPRO increase
+            if "SHY" in scaled and scaled["SHY"] > upro_increase:
+                scaled["SHY"] -= upro_increase
+            else:
+                # Spread reduction across other assets proportionally
+                other_total = sum(v for k, v in scaled.items() if k != "UPRO")
+                if other_total > 0:
+                    for asset in scaled:
+                        if asset != "UPRO":
+                            scaled[asset] -= (scaled[asset] / other_total) * upro_increase
+
+        return scaled
+
     def apply_to_series(
         self,
         proposed_weights_series: List[Dict[str, float]],

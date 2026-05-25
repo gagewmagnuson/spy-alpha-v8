@@ -515,27 +515,25 @@ def run_daily(
         for asset, w in output.proposed_weights.items():
             blended[asset] = blended.get(asset, 0) + cap_w * w
  
-    # ---- Apply risk engine ----
+ 
+    # ---- Process through multi-horizon coordinator ----
+    # This is the SAME path as the backtest:
+    #   posture bias -> slow layer bounds -> risk engine -> fast layer
     adj_close = get_adj_close(snap)
     spy_prices = adj_close["SPY"] if "SPY" in adj_close.columns else pd.Series()
     current_date = state.index[-1]
- 
+
     stress = s3.get_stress_score()
     stress_val = float(stress.iloc[-1]) if stress is not None and len(stress) > 0 else 0.0
- 
-    engine = RiskEngine()
+
     strategy_w = {name: o.proposed_weights for name, o in strategy_outputs_latest.items()}
- 
-    risk_adjusted, risk_meta = engine.apply(
-        blended, strategy_w, state,
-        spy_prices, current_date,
-        stress_score=stress_val,
-    )
- 
-    # ---- Apply multi-horizon ----
+
     coordinator = MultiHorizonCoordinator()
     final_weights, mh_meta = coordinator.process(
-        risk_adjusted, state, spy_prices, current_date,
+        proposed_weights=blended,
+        state_features=state,
+        spy_prices=spy_prices,
+        current_date=current_date,
         strategy_weights=strategy_w,
         stress_score=stress_val,
         force_slow_update=True,
@@ -564,6 +562,9 @@ def run_daily(
         total = sum(final_weights.values())
         if total > 0:
             final_weights = {k: v / total for k, v in final_weights.items()}
+
+    # ---- Get risk metadata from coordinator's last engine run ----
+    risk_meta = mh_meta.get("risk_engine", {})
 
     # ---- Build signal with attribution ----
     latest_state = state.iloc[-1]

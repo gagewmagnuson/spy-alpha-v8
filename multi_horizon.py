@@ -501,9 +501,15 @@ class MultiHorizonCoordinator:
         )
  
         if should_update_medium:
-            # Apply slow layer bounds to proposed weights
-            self.medium_weights = apply_slow_layer_bounds(
+            # Apply posture-aware capital weight adjustment
+            # When slow layer is aggressive and uncertainty is low,
+            # boost equity exposure by scaling up equity assets
+            adjusted_proposed = self._apply_posture_bias(
                 proposed_weights, self.current_slow_state
+            )
+            # Apply slow layer bounds to adjusted weights
+            self.medium_weights = apply_slow_layer_bounds(
+                adjusted_proposed, self.current_slow_state
             )
             self.last_medium_update = current_date
         # Otherwise hold existing medium weights
@@ -545,6 +551,74 @@ class MultiHorizonCoordinator:
  
         return final_weights, metadata
  
+    def _apply_posture_bias(
+        self,
+        weights: Dict[str, float],
+        slow_state: SlowLayerState,
+    ) -> Dict[str, float]:
+        """
+        Adjust proposed weights based on the slow layer's strategic posture.
+
+        When posture is aggressive:
+            - Scale up equity assets (where Strategy 1 dominates)
+            - Scale down defensive assets
+            - This allows more of Strategy 1's alpha to pass through
+
+        When posture is defensive:
+            - Scale down equity, scale up bonds/cash
+            - Protective behavior
+
+        When balanced:
+            - No adjustment (pass through as-is)
+
+        This is the key mechanism for CAGR recovery: the slow layer
+        identifies favorable environments, and this bias lets the
+        portfolio express more conviction in those periods.
+        """
+        if slow_state.risk_posture == "balanced":
+            return weights.copy()
+
+        adjusted = weights.copy()
+        composite = slow_state.metadata.get("composite_score", 0.5)
+
+        if slow_state.risk_posture == "aggressive":
+            # Scale up equity, scale down defensive
+            # Intensity based on composite score (0.65-1.0 range for aggressive)
+            intensity = min((composite - 0.65) / 0.35, 1.0)  # 0 at threshold, 1 at max
+            intensity = max(intensity, 0)
+
+            equity_boost = 1.0 + intensity * 0.30   # up to 30% boost to equity weights
+            defensive_cut = 1.0 - intensity * 0.25  # up to 25% reduction to defensive
+
+            for asset in adjusted:
+                if asset in EQUITY_ASSETS:
+                    adjusted[asset] *= equity_boost
+                elif asset in BOND_ASSETS and asset != "SHY":
+                    adjusted[asset] *= defensive_cut
+                elif asset == "SHY":
+                    adjusted[asset] *= defensive_cut
+
+        elif slow_state.risk_posture == "defensive":
+            # Scale down equity, scale up defensive
+            intensity = min((0.40 - composite) / 0.40, 1.0)  # 0 at threshold, 1 at min
+            intensity = max(intensity, 0)
+
+            equity_cut = 1.0 - intensity * 0.25      # up to 25% reduction to equity
+            defensive_boost = 1.0 + intensity * 0.20  # up to 20% boost to defensive
+
+            for asset in adjusted:
+                if asset in EQUITY_ASSETS:
+                    adjusted[asset] *= equity_cut
+                elif asset in BOND_ASSETS or asset == "SHY":
+                    adjusted[asset] *= defensive_boost
+
+        # Renormalize
+        total = sum(adjusted.values())
+        if total > 0:
+            adjusted = {k: v / total for k, v in adjusted.items()}
+
+        return adjusted
+
     def _trading_days_since(
         self,
         last_date: pd.Timestamp,

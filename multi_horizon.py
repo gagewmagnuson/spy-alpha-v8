@@ -42,7 +42,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
- 
+from risk_engine import RiskEngine, get_risk_profile
+
 import numpy as np
 import pandas as pd
  
@@ -427,7 +428,9 @@ class MultiHorizonCoordinator:
     proper interaction between temporal scales.
     """
  
-    def __init__(self):
+    def __init__(self, profile: Optional[str] = None):
+        self.profile_name = profile or "balanced"
+        self.profile = get_risk_profile(self.profile_name) if profile else None
         self.current_slow_state: Optional[SlowLayerState] = None
         self.last_slow_update: Optional[pd.Timestamp] = None
         self.last_medium_update: Optional[pd.Timestamp] = None
@@ -505,7 +508,7 @@ class MultiHorizonCoordinator:
             # When slow layer is aggressive and uncertainty is low,
             # boost equity exposure by scaling up equity assets
             adjusted_proposed = self._apply_posture_bias(
-                proposed_weights, self.current_slow_state
+                proposed_weights, self.current_slow_state, profile=self.profile
             )
             # Apply slow layer bounds to adjusted weights
             self.medium_weights = apply_slow_layer_bounds(
@@ -521,7 +524,7 @@ class MultiHorizonCoordinator:
  
         # ---- Apply Risk Engine (uncertainty dampening + constraints) ----
         from risk_engine import RiskEngine
-        engine = RiskEngine()
+        engine = RiskEngine(profile=self.profile_name)
         risk_adjusted, risk_meta = engine.apply(
             self.medium_weights,
             strategy_weights or {},
@@ -555,6 +558,7 @@ class MultiHorizonCoordinator:
         self,
         weights: Dict[str, float],
         slow_state: SlowLayerState,
+        profile: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, float]:
         """
         Adjust proposed weights based on the slow layer's strategic posture.
@@ -587,8 +591,10 @@ class MultiHorizonCoordinator:
             intensity = min((composite - 0.65) / 0.35, 1.0)  # 0 at threshold, 1 at max
             intensity = max(intensity, 0)
 
-            equity_boost = 1.0 + intensity * 0.30   # up to 30% boost to equity weights
-            defensive_cut = 1.0 - intensity * 0.25  # up to 25% reduction to defensive
+            boost_factor = profile.get("posture_equity_boost", 0.30) if profile else 0.30
+            cut_factor = profile.get("posture_defensive_cut", 0.25) if profile else 0.25
+            equity_boost = 1.0 + intensity * boost_factor
+            defensive_cut = 1.0 - intensity * cut_factor
 
             for asset in adjusted:
                 if asset in EQUITY_ASSETS:
@@ -603,8 +609,10 @@ class MultiHorizonCoordinator:
             intensity = min((0.40 - composite) / 0.40, 1.0)  # 0 at threshold, 1 at min
             intensity = max(intensity, 0)
 
-            equity_cut = 1.0 - intensity * 0.25      # up to 25% reduction to equity
-            defensive_boost = 1.0 + intensity * 0.20  # up to 20% boost to defensive
+            cut_factor = profile.get("posture_defensive_cut", 0.25) if profile else 0.25
+            boost_factor = profile.get("posture_equity_boost", 0.20) if profile else 0.20
+            equity_cut = 1.0 - intensity * cut_factor
+            defensive_boost = 1.0 + intensity * boost_factor
 
             for asset in adjusted:
                 if asset in EQUITY_ASSETS:
@@ -640,6 +648,7 @@ def backtest_multi_horizon(
     state_features: pd.DataFrame,
     adj_close: pd.DataFrame,
     stress_scores: Optional[pd.Series] = None,
+    profile: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Backtest the full multi-horizon framework.
@@ -706,7 +715,7 @@ def backtest_multi_horizon(
         strat_w_by_date[date] = strat_w
  
     # ---- Run multi-horizon on every trading day ----
-    coordinator = MultiHorizonCoordinator()
+    coordinator = MultiHorizonCoordinator(profile=profile)
  
     mh_returns_list = []
     raw_returns_list = []

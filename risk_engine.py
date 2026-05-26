@@ -73,7 +73,65 @@ STRESSED_CONSTRAINTS: Dict[str, Any] = {
     "vol_target_high": 0.10,
     "vol_target_mid": 0.08,
 }
- 
+
+# ---------------------------------------------------------------------------
+# Risk Profiles (from build spec Section 8B)
+# ---------------------------------------------------------------------------
+
+RISK_PROFILES: Dict[str, Dict[str, Any]] = {
+    "aggressive": {
+        "vol_target_low": 0.12,
+        "vol_target_high": 0.18,
+        "vol_target_mid": 0.15,
+        "max_upro_weight": 0.45,
+        "max_leverage": 1.30,
+        "uncertainty_threshold": 0.60,
+        "uncertainty_shy_boost": 0.03,
+        "uncertainty_equal_blend": 0.05,
+        "upro_scaling_ceiling": 0.90,
+        "upro_scaling_blend": 0.75,
+        "posture_equity_boost": 0.50,
+        "posture_defensive_cut": 0.40,
+    },
+    "balanced": {
+        "vol_target_low": 0.08,
+        "vol_target_high": 0.14,
+        "vol_target_mid": 0.12,
+        "max_upro_weight": 0.35,
+        "max_leverage": 1.00,
+        "uncertainty_threshold": 0.40,
+        "uncertainty_shy_boost": 0.08,
+        "uncertainty_equal_blend": 0.20,
+        "upro_scaling_ceiling": 0.60,
+        "upro_scaling_blend": 0.50,
+        "posture_equity_boost": 0.30,
+        "posture_defensive_cut": 0.25,
+    },
+    "defensive": {
+        "vol_target_low": 0.06,
+        "vol_target_high": 0.10,
+        "vol_target_mid": 0.08,
+        "max_upro_weight": 0.20,
+        "max_leverage": 0.80,
+        "uncertainty_threshold": 0.30,       # lower = more sensitive
+        "uncertainty_shy_boost": 0.15,       # more SHY injection
+        "uncertainty_equal_blend": 0.35,     # more equal-weight blending
+        "upro_scaling_ceiling": 0.30,        # lower UPRO target
+        "upro_scaling_blend": 0.30,          # slower approach
+        "posture_equity_boost": 0.15,        # modest equity boost
+        "posture_defensive_cut": 0.10,       # minimal defensive cut
+    },
+}
+
+DEFAULT_PROFILE: str = "aggressive"
+
+
+def get_risk_profile(name: str = DEFAULT_PROFILE) -> Dict[str, Any]:
+    """Get a risk profile by name."""
+    if name not in RISK_PROFILES:
+        logger.warning(f"Unknown profile '{name}', using '{DEFAULT_PROFILE}'")
+        name = DEFAULT_PROFILE
+    return RISK_PROFILES[name] 
  
 # ---------------------------------------------------------------------------
 # 7B. Circuit Breakers (Ported from V7)
@@ -393,11 +451,21 @@ class RiskEngine:
     a risk-adjusted portfolio that satisfies all constraints.
     """
  
-    def __init__(self):
+    def __init__(self, profile: Optional[str] = None):
+        self.profile_name = profile or DEFAULT_PROFILE
+        self.profile = get_risk_profile(self.profile_name)
         self.last_uncertainty_score: float = 0.0
         self.last_uncertainty_components: Dict[str, float] = {}
         self.last_breaker_metadata: Dict[str, Any] = {}
         self.last_active_constraints: Dict[str, Any] = HARD_CONSTRAINTS.copy()
+
+        # Override hard constraints with profile values
+        if self.profile.get("max_upro_weight"):
+            self.last_active_constraints["max_upro_weight"] = self.profile["max_upro_weight"]
+        if self.profile.get("vol_target_low"):
+            self.last_active_constraints["vol_target_low"] = self.profile["vol_target_low"]
+            self.last_active_constraints["vol_target_high"] = self.profile["vol_target_high"]
+            self.last_active_constraints["vol_target_mid"] = self.profile["vol_target_mid"]
  
     def apply(
         self,
@@ -500,8 +568,8 @@ class RiskEngine:
             - Increase cash/SHY allocation
             - Shift trust toward observable states (implicit via constraint tightening)
         """
-        if uncertainty < 0.4:
-            # Below 0.4 uncertainty — no dampening needed
+        threshold = self.profile.get("uncertainty_threshold", 0.4)
+        if uncertainty < threshold:
             # The risk engine, circuit breakers, and fast layer provide
             # sufficient protection at normal uncertainty levels
             return weights.copy()
@@ -513,7 +581,7 @@ class RiskEngine:
         # 0.6 uncertainty → 33% dampening
         # 0.8 uncertainty → 67% dampening
         # 1.0 uncertainty → 100% dampening
-        dampen_intensity = (uncertainty - 0.4) / 0.6
+        dampen_intensity = (uncertainty - threshold) / (1.0 - threshold)
         dampen_intensity = min(max(dampen_intensity, 0), 1.0)
  
         # ---- Reduce UPRO proportionally ----
@@ -526,14 +594,14 @@ class RiskEngine:
             n_assets = len(dampened)
             equal_w = 1.0 / n_assets
  
-            blend_toward_equal = dampen_intensity * 0.20  # at max, blend 20% toward equal
+            blend_toward_equal = dampen_intensity * self.profile.get("uncertainty_equal_blend", 0.20)
 
             for asset in dampened:
                 current = dampened[asset]
                 dampened[asset] = current * (1 - blend_toward_equal) + equal_w * blend_toward_equal
 
         # ---- Increase SHY allocation ----
-        shy_boost = dampen_intensity * 0.08  # at max uncertainty, add 8% SHY
+        shy_boost = dampen_intensity * self.profile.get("uncertainty_shy_boost", 0.08)
         dampened["SHY"] = dampened.get("SHY", 0) + shy_boost
  
         return dampened
@@ -653,12 +721,13 @@ class RiskEngine:
         # Scale from current weight toward a target based on intensity
         # At full intensity, target is the constraint ceiling * 0.6
         max_upro = active_constraints.get("max_upro_weight", 0.45)
-        target_upro = max_upro * 0.6 * intensity  # max ~27% at full intensity
+        ceiling = self.profile.get("upro_scaling_ceiling", 0.60)
+        target_upro = max_upro * ceiling * intensity
 
         # Only scale UP, never down
         if target_upro > scaled["UPRO"]:
             # Blend toward target — don't jump there
-            blend = 0.5  # 50% of the way toward target
+            blend = self.profile.get("upro_scaling_blend", 0.50)
             new_upro = scaled["UPRO"] + blend * (target_upro - scaled["UPRO"])
             upro_increase = new_upro - scaled["UPRO"]
 

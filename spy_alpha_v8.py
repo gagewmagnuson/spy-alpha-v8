@@ -74,6 +74,7 @@ def run_backtest(
     extended_snapshot_name: str = "baseline_v7_extended",
     fred_api_key: Optional[str] = None,
     data_dir: Optional[str] = None,
+    profile: str = "balanced",
 ) -> Dict[str, Any]:
     """
     Run the full v8 walk-forward backtest.
@@ -156,6 +157,7 @@ def run_backtest(
         state,
         adj_close,
         stress_scores=stress_scores,
+        profile=profile,
     )
  
     # ---- Print Results ----
@@ -428,6 +430,7 @@ def run_daily(
     fred_api_key: Optional[str] = None,
     data_dir: Optional[str] = None,
     save_signal: bool = True,
+    profile: str = "balanced",
 ) -> Dict[str, Any]:
     """
     Run the daily live inference pipeline.
@@ -528,7 +531,7 @@ def run_daily(
 
     strategy_w = {name: o.proposed_weights for name, o in strategy_outputs_latest.items()}
 
-    coordinator = MultiHorizonCoordinator()
+    coordinator = MultiHorizonCoordinator(profile=profile)
     final_weights, mh_meta = coordinator.process(
         proposed_weights=blended,
         state_features=state,
@@ -618,10 +621,12 @@ def main():
     bt_parser = subparsers.add_parser("backtest", help="Run full walk-forward backtest")
     bt_parser.add_argument("--snapshot", type=str, default="baseline_v7", help="Snapshot name")
     bt_parser.add_argument("--extended", type=str, default="baseline_v7_extended", help="Extended snapshot")
+    bt_parser.add_argument("--profile", type=str, default="balanced", choices=["aggressive", "balanced", "defensive"], help="Risk profile")
  
     # ---- Daily ----
     daily_parser = subparsers.add_parser("daily", help="Run daily live inference")
     daily_parser.add_argument("--snapshot", type=str, default="baseline_v7", help="Snapshot name")
+    daily_parser.add_argument("--profile", type=str, default="balanced", choices=["aggressive", "balanced", "defensive"], help="Risk profile")
     daily_parser.add_argument("--no-save", action="store_true", help="Don't save signal")
  
     # ---- Snapshot ----
@@ -650,6 +655,7 @@ def main():
             extended_snapshot_name=args.extended,
             fred_api_key=args.fred_key,
             data_dir=args.data_dir,
+            profile=args.profile,
         )
  
     elif args.command == "daily":
@@ -658,6 +664,7 @@ def main():
             fred_api_key=args.fred_key,
             data_dir=args.data_dir,
             save_signal=not args.no_save,
+            profile=args.profile,
         )
  
     elif args.command == "snapshot":

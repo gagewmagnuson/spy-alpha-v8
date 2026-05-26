@@ -21,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install numpy pandas scikit-learn hmmlearn yfinance matplotlib pyarrow scipy fredapi lightgbm alpaca-trade-api
+          pip install numpy pandas scikit-learn hmmlearn yfinance matplotlib pyarrow scipy fredapi lightgbm alpaca-trade-api alpha_vantage
 
       - name: Run daily pipeline
         env:

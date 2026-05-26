@@ -325,13 +325,38 @@ class AlpacaExecutor:
             notional = abs(delta["delta_value"])
 
             try:
-                order = self.api.submit_order(
-                    symbol=symbol,
-                    notional=round(notional, 2),
-                    side=side,
-                    type="market",
-                    time_in_force="day",
-                )
+                # Try notional order first, fall back to qty-based
+                try:
+                    order = self.api.submit_order(
+                        symbol=symbol,
+                        notional=round(notional, 2),
+                        side=side,
+                        type="market",
+                        time_in_force="day",
+                    )
+                except TypeError:
+                    # Older SDK versions don't support notional — use qty
+                    try:
+                        price = float(self.api.get_latest_trade(symbol).price)
+                        qty = int(notional / price)
+                        if qty < 1:
+                            logger.warning(f"  Skipping {symbol}: qty would be 0")
+                            results.append({
+                                "symbol": symbol,
+                                "side": side,
+                                "notional": notional,
+                                "skipped": True,
+                            })
+                            continue
+                        order = self.api.submit_order(
+                            symbol=symbol,
+                            qty=qty,
+                            side=side,
+                            type="market",
+                            time_in_force="day",
+                        )
+                    except Exception as e2:
+                        raise e2
 
                 results.append({
                     "symbol": symbol,

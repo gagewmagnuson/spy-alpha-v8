@@ -21,12 +21,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install numpy pandas scikit-learn hmmlearn yfinance matplotlib pyarrow scipy fredapi lightgbm
+          pip install numpy pandas scikit-learn hmmlearn yfinance matplotlib pyarrow scipy fredapi lightgbm alpaca-trade-api
 
       - name: Run daily pipeline
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python3 spy_alpha_v8.py --fred-key $FRED_API_KEY daily --snapshot baseline_v7
+
+      - name: Execute rebalance (paper trading)
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: python3 spy_alpha_v8.py execute
 
       - name: Commit signals and prediction history
         run: |

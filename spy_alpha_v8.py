@@ -628,6 +628,12 @@ def main():
     daily_parser.add_argument("--snapshot", type=str, default="baseline_v7", help="Snapshot name")
     daily_parser.add_argument("--profile", type=str, default="balanced", choices=["aggressive", "balanced", "defensive"], help="Risk profile")
     daily_parser.add_argument("--no-save", action="store_true", help="Don't save signal")
+
+    # ---- Execute ----
+    exec_parser = subparsers.add_parser("execute", help="Execute rebalance via Alpaca")
+    exec_parser.add_argument("--dry-run", action="store_true", help="Compute orders without submitting")
+    exec_parser.add_argument("--signal", type=str, default="signals/latest_prediction.json", help="Signal file path")
+    exec_parser.add_argument("--summary", action="store_true", help="Show current portfolio summary only")
  
     # ---- Snapshot ----
     snap_parser = subparsers.add_parser("snapshot", help="Create/manage snapshots")
@@ -703,6 +709,31 @@ def main():
             report = mgr.compare_snapshots(args.name, args.compare_to)
             print(json.dumps(report, indent=2))
  
- 
+
+    elif args.command == "execute":
+        import os
+        if args.fred_key:
+            os.environ["FRED_API_KEY"] = args.fred_key
+        os.environ.setdefault("ALPACA_API_KEY", "")
+        os.environ.setdefault("ALPACA_SECRET_KEY", "")
+
+        from execution_engine import AlpacaExecutor, print_execution_report
+
+        executor = AlpacaExecutor()
+
+        if args.summary:
+            summary = executor.get_portfolio_summary()
+            print(f"\nPortfolio Value: ${summary['portfolio_value']:,.2f}")
+            print(f"Cash: ${summary['cash']:,.2f}")
+            print(f"Positions: {summary['n_positions']}")
+            for h in summary["holdings"]:
+                print(f"  {h['symbol']:<8s} ${h['market_value']:>10,.2f} ({h['weight']:>6.1%})  P&L: {h['unrealized_plpc']:>+.1%}")
+        else:
+            report = executor.execute_rebalance(
+                signal_path=Path(args.signal),
+                dry_run=args.dry_run,
+            )
+            print_execution_report(report)
+
 if __name__ == "__main__":
     main()

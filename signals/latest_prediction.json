@@ -1,14 +1,7 @@
 {
-<<<<<<< HEAD
-  "generated_at": "2026-05-25T17:04:39.076444+00:00",
-=======
-  "generated_at": "2026-05-25T02:38:54.108353+00:00",
->>>>>>> b7a2cdba3cab4aee1b2bdd29f6d015f24065113b
-  "forecast_date": "2026-05-22",
+  "generated_at": "2026-05-26T21:55:20.423658+00:00",
+  "forecast_date": "2026-05-26",
   "state_assessment": {
-    "volatility_regime": "normal_vol",
-    "realized_vol_10d": 0.1062,
-    "trend_strength": 0.965,
     "hmm_dominant_regime": "Unknown",
     "macro_conditions": "flat_curve"
   },
@@ -44,8 +37,8 @@
     "tightening_level": 0.412,
     "circuit_breaker": "none",
     "crash_momentum": false,
-    "strategic_posture": "aggressive",
-    "leverage_ceiling": 1.16,
+    "strategic_posture": "balanced",
+    "leverage_ceiling": 0.95,
     "fast_layer_override": false
   },
   "portfolio": {
@@ -64,45 +57,24 @@
       "CAT"
     ],
     "weights": {
-<<<<<<< HEAD
-      "SHY": 0.2993,
-      "SPY": 0.1111,
-      "XLF": 0.0852,
-      "QQQ": 0.0766,
-      "XLK": 0.0766,
-      "IWM": 0.0669,
-      "XLE": 0.0547,
-      "VWO": 0.0529,
-      "SMH": 0.0497,
-      "GLD": 0.0431,
-      "AMZN": 0.043,
-      "CAT": 0.0408
+      "SHY": 0.3485,
+      "SPY": 0.1025,
+      "XLF": 0.0786,
+      "QQQ": 0.0707,
+      "XLK": 0.0707,
+      "IWM": 0.0617,
+      "XLE": 0.0505,
+      "VWO": 0.0488,
+      "SMH": 0.0459,
+      "GLD": 0.0449,
+      "AMZN": 0.0397,
+      "CAT": 0.0377
     },
     "n_assets": 12,
     "upro_weight": 0,
-    "shy_weight": 0.2993,
+    "shy_weight": 0.3485,
     "tlt_weight": 0,
-    "gld_weight": 0.0431
-=======
-      "SHY": 0.3806,
-      "SPY": 0.091,
-      "XLF": 0.0719,
-      "QQQ": 0.0655,
-      "XLK": 0.0655,
-      "IWM": 0.0583,
-      "XLE": 0.0493,
-      "VWO": 0.0479,
-      "SMH": 0.0456,
-      "GLD": 0.0448,
-      "AMZN": 0.0406,
-      "CAT": 0.039
-    },
-    "n_assets": 12,
-    "upro_weight": 0,
-    "shy_weight": 0.3806,
-    "tlt_weight": 0,
-    "gld_weight": 0.0448
->>>>>>> b7a2cdba3cab4aee1b2bdd29f6d015f24065113b
+    "gld_weight": 0.0449
   },
   "attribution": {
     "regime_allocator_contribution": "35%",

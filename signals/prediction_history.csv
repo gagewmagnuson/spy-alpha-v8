@@ -5,3 +5,4 @@ date,generated_at,state_volatility_regime,state_realized_vol_10d,state_trend_str
 =======
 2026-05-22,2026-05-25T02:38:54.108353+00:00,normal_vol,0.1062,0.965,Unknown,flat_curve,0.35,0.575,20,Crisis-Inflation,"['AAPL', 'AMZN', 'CAT']",0.35,0.727,8,bullish,8,0.3,0.1,3,0.211,False,0.412,0.412,none,False,aggressive,1.16,False,12,0,0.3806,SHY,0.3806,SPY,0.091,XLF,0.0719,QQQ,0.0655,XLK,0.0655,35%,35%,30%,-2%,-1%,,
 >>>>>>> b7a2cdba3cab4aee1b2bdd29f6d015f24065113b
+2026-05-26,2026-05-26T21:55:20.423658+00:00,Unknown,flat_curve,0.35,0.575,20,Crisis-Inflation,"['AAPL', 'AMZN', 'CAT']",0.35,0.727,8,bullish,8,0.3,0.1,3,0.211,False,0.412,0.412,none,False,balanced,0.95,False,12,0,0.3485,SHY,0.3485,SPY,0.1025,XLF,0.0786,QQQ,0.0707,XLK,0.0707,35%,35%,30%,-2%,-1%,,

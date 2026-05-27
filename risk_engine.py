@@ -92,6 +92,7 @@ RISK_PROFILES: Dict[str, Dict[str, Any]] = {
         "upro_scaling_blend": 0.75,
         "posture_equity_boost": 0.50,
         "posture_defensive_cut": 0.40,
+        "conditional_max_boost": 0.55,
     },
     "balanced": {
         "vol_target_low": 0.08,
@@ -106,6 +107,7 @@ RISK_PROFILES: Dict[str, Dict[str, Any]] = {
         "upro_scaling_blend": 0.50,
         "posture_equity_boost": 0.30,
         "posture_defensive_cut": 0.25,
+        "conditional_max_boost": 0.45,
     },
     "defensive": {
         "vol_target_low": 0.06,
@@ -119,8 +121,9 @@ RISK_PROFILES: Dict[str, Dict[str, Any]] = {
         "upro_scaling_ceiling": 0.30,        # lower UPRO target
         "upro_scaling_blend": 0.30,          # slower approach
         "posture_equity_boost": 0.15,        # modest equity boost
-        "posture_defensive_cut": 0.10,       # minimal defensive cut
-    },
+        "posture_defensive_cut": 0.10,
+        "conditional_max_boost": 0.25,       # minimal defensive cut
+    }
 }
 
 DEFAULT_PROFILE: str = "aggressive"

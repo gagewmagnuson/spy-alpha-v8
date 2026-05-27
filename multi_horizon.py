@@ -245,7 +245,100 @@ def _default_slow_state(date: pd.Timestamp) -> SlowLayerState:
         risk_posture="balanced",
         metadata={"composite_score": 0.5},
     )
- 
+
+# ---------------------------------------------------------------------------
+# Conditional Weighting Layer (Priority 1 — CAGR Recovery)
+# ---------------------------------------------------------------------------
+
+def apply_conditional_weighting(
+    capital_weights: Dict[str, float],
+    posture_strength: float,
+    uncertainty: float,
+    stress: float,
+    max_boost: float = 0.45,
+    s2_share: float = 0.5,
+    profile: Optional[Dict[str, Any]] = None,
+) -> Tuple[Dict[str, float], Dict[str, float]]:
+    """
+    Adjust meta-allocator capital weights based on continuous market conditions.
+
+    When conditions are jointly favorable (aggressive posture, low uncertainty,
+    low stress), increase Strategy 1's capital allocation at the expense of
+    Strategies 2 and 3. When any condition deteriorates, the boost decays
+    smoothly toward zero.
+
+    This layer sits AFTER the allocator output and BEFORE strategy blending.
+    It modifies capital weights, NOT direct asset allocations.
+
+    The multiplicative favorable_score ensures the boost only fires when
+    ALL three inputs are favorable — any single bad signal suppresses it.
+
+    Args:
+        capital_weights: {strategy_name: weight} from allocator, sums to 1.0
+        posture_strength: slow layer composite_score in [0, 1]
+        uncertainty: uncertainty score in [0, 1]
+        stress: stress score in [0, 1]
+        max_boost: maximum S1 weight increase (default 0.25)
+        s2_share: fraction of boost taken from S2 vs S3 (default 0.5)
+        profile: risk profile dict (can override max_boost)
+
+    Returns:
+        (adjusted_weights, diagnostics)
+    """
+    if profile and "conditional_max_boost" in profile:
+        max_boost = profile["conditional_max_boost"]
+
+    # ---- Compute favorable score (multiplicative) ----
+    # All three must be favorable for full boost
+    favorable_score = posture_strength * (1.0 - uncertainty) * (1.0 - stress)
+    favorable_score = max(min(favorable_score, 1.0), 0.0)
+
+    # ---- Compute S1 boost ----
+    s1_boost = max_boost * favorable_score
+
+    # ---- Get base weights ----
+    s1_key = "regime_allocator"
+    s2_key = "trend_cta"
+    s3_key = "defensive"
+
+    base_s1 = capital_weights.get(s1_key, 1.0 / 3)
+    base_s2 = capital_weights.get(s2_key, 1.0 / 3)
+    base_s3 = capital_weights.get(s3_key, 1.0 / 3)
+
+    # ---- Apply boost: add to S1, subtract from S2/S3 proportionally ----
+    adj_s1 = base_s1 + s1_boost
+
+    # Split the reduction between S2 and S3
+    s2_reduction = s1_boost * s2_share
+    s3_reduction = s1_boost * (1.0 - s2_share)
+
+    adj_s2 = max(base_s2 - s2_reduction, 0.05)  # floor at 5%
+    adj_s3 = max(base_s3 - s3_reduction, 0.05)  # floor at 5%
+
+    # ---- Normalize to sum to 1.0 ----
+    total = adj_s1 + adj_s2 + adj_s3
+    adjusted = {
+        s1_key: adj_s1 / total,
+        s2_key: adj_s2 / total,
+        s3_key: adj_s3 / total,
+    }
+
+    # ---- Diagnostics ----
+    diagnostics = {
+        "favorable_score": float(favorable_score),
+        "s1_boost": float(s1_boost),
+        "posture_strength": float(posture_strength),
+        "uncertainty": float(uncertainty),
+        "stress": float(stress),
+        "base_s1": float(base_s1),
+        "adjusted_s1": float(adjusted[s1_key]),
+        "base_s2": float(base_s2),
+        "adjusted_s2": float(adjusted[s2_key]),
+        "base_s3": float(base_s3),
+        "adjusted_s3": float(adjusted[s3_key]),
+    }
+
+    return adjusted, diagnostics 
  
 # ---------------------------------------------------------------------------
 # Medium Layer — Strategy Activation & Capital Sizing
@@ -504,9 +597,38 @@ class MultiHorizonCoordinator:
         )
  
         if should_update_medium:
-            # Apply posture-aware capital weight adjustment
-            # When slow layer is aggressive and uncertainty is low,
-            # boost equity exposure by scaling up equity assets
+            # ---- Apply conditional weighting to capital weights ----
+            # This adjusts how much capital each strategy receives
+            # based on posture strength, uncertainty, and stress.
+            # Must happen BEFORE strategy blending.
+            if strategy_weights:
+                from risk_engine import compute_uncertainty_score
+                unc_score, _ = compute_uncertainty_score(
+                    state_features, strategy_weights, allocator_confidence
+                )
+                posture_strength = self.current_slow_state.metadata.get("composite_score", 0.5)
+
+                # Extract base capital weights from proposed (if embedded)
+                # For live mode, proposed_weights already has strategies blended,
+                # so we re-blend with adjusted capital weights
+                risk_profile = self.profile
+                adjusted_cap, cw_diag = apply_conditional_weighting(
+                    {name: 1.0 / len(strategy_weights) for name in strategy_weights},
+                    posture_strength, unc_score, stress_score,
+                    profile=risk_profile,
+                )
+
+                # Re-blend using adjusted capital weights
+                reblended = {}
+                for name, strat_w in strategy_weights.items():
+                    cap_w = adjusted_cap.get(name, 1.0 / len(strategy_weights))
+                    for asset, w in strat_w.items():
+                        reblended[asset] = reblended.get(asset, 0) + cap_w * w
+
+                proposed_weights = reblended
+                metadata["conditional_weighting"] = cw_diag
+
+            # Apply posture-aware equity/defensive scaling
             adjusted_proposed = self._apply_posture_bias(
                 proposed_weights, self.current_slow_state, profile=self.profile
             )
@@ -689,28 +811,62 @@ def backtest_multi_horizon(
  
     proposed_by_date = {}
     strat_w_by_date = {}
- 
+    conditional_diagnostics = {}
+
+    # Pre-compute uncertainty series for conditional weighting
+    from risk_engine import compute_uncertainty_score
+
     for date in alloc_dates:
         date_str = date.strftime("%Y-%m-%d")
- 
+
         for name in strategy_names:
             available = sorted(strat_weights_by_name.get(name, {}).keys())
             prior = [d for d in available if d <= date_str]
             if prior:
                 current_strat_weights[name] = strat_weights_by_name[name][prior[-1]]
- 
+
+        # ---- Read base capital weights from allocator ----
+        base_cap_weights = {}
+        for name in strategy_names:
+            cap_col = f"capital_weight_{name}"
+            base_cap_weights[name] = allocator_results.loc[date, cap_col] if cap_col in allocator_results.columns else 1.0 / len(strategy_names)
+
+        # ---- Compute conditional weighting inputs ----
+        # Posture strength: from slow layer composite score
+        state_up_to = state_features.loc[:date]
+        slow_state = compute_slow_layer(state_up_to, date)
+        posture_strength = slow_state.metadata.get("composite_score", 0.5)
+
+        # Uncertainty: compute from state + strategy weights
+        unc_score, _ = compute_uncertainty_score(
+            state_up_to, current_strat_weights
+        )
+
+        # Stress: from defensive strategy
+        stress_val = 0.0
+        if stress_scores is not None and date in stress_scores.index:
+            stress_val = float(stress_scores.loc[date]) if not pd.isna(stress_scores.loc[date]) else 0.0
+
+        # ---- Apply conditional weighting ----
+        risk_profile = get_risk_profile(profile) if profile else None
+        adjusted_cap_weights, cw_diag = apply_conditional_weighting(
+            base_cap_weights, posture_strength, unc_score, stress_val,
+            profile=risk_profile,
+        )
+        conditional_diagnostics[date] = cw_diag
+
+        # ---- Blend strategy weights using adjusted capital weights ----
         blended = {}
         strat_w = {}
         for name in strategy_names:
-            cap_col = f"capital_weight_{name}"
-            cap_weight = allocator_results.loc[date, cap_col] if cap_col in allocator_results.columns else 1.0 / len(strategy_names)
- 
+            cap_weight = adjusted_cap_weights.get(name, 1.0 / len(strategy_names))
+
             strat_proposed = current_strat_weights[name]
             strat_w[name] = strat_proposed
- 
+
             for asset, w in strat_proposed.items():
                 blended[asset] = blended.get(asset, 0) + cap_weight * w
- 
+
         proposed_by_date[date] = blended
         strat_w_by_date[date] = strat_w
  
@@ -839,6 +995,29 @@ def backtest_multi_horizon(
         lambda x: x.get("override_active", False) if isinstance(x, dict) else False
     )
  
+    # ---- Conditional weighting diagnostics ----
+    cw_diag_df = pd.DataFrame.from_dict(conditional_diagnostics, orient="index")
+    cw_diag_df.index.name = "date"
+
+    # Compute conditional weighting summary by posture bucket
+    cw_summary = {}
+    if not cw_diag_df.empty:
+        # Map each date to its posture
+        cw_diag_df["posture"] = slow_postures.reindex(cw_diag_df.index).ffill()
+
+        for posture in ["aggressive", "balanced", "defensive"]:
+            mask = cw_diag_df["posture"] == posture
+            if mask.any():
+                subset = cw_diag_df.loc[mask]
+                cw_summary[posture] = {
+                    "count": int(mask.sum()),
+                    "mean_favorable_score": float(subset["favorable_score"].mean()),
+                    "mean_s1_boost": float(subset["s1_boost"].mean()),
+                    "mean_adj_s1": float(subset["adjusted_s1"].mean()),
+                    "mean_adj_s2": float(subset["adjusted_s2"].mean()),
+                    "mean_adj_s3": float(subset["adjusted_s3"].mean()),
+                }
+
     return {
         "mh_metrics": compute_metrics(mh_returns, "Multi-Horizon"),
         "raw_metrics": compute_metrics(raw_returns, "Allocator Only"),
@@ -850,6 +1029,8 @@ def backtest_multi_horizon(
         "slow_posture_distribution": slow_postures.value_counts().to_dict(),
         "fast_override_rate": float(fast_overrides.mean()),
         "fast_override_days": int(fast_overrides.sum()),
+        "conditional_weighting_diagnostics": cw_diag_df,
+        "conditional_weighting_summary": cw_summary,
     }
  
  
@@ -902,3 +1083,30 @@ def print_multi_horizon_report(results: Dict[str, Any]) -> None:
         print(f"  MaxDD improved:     {raw['max_dd']:.1%} -> {mh['max_dd']:.1%} -> {'PASS' if dd_improved else 'FAIL'}")
         print(f"  Sharpe preserved:   {raw['sharpe']:.2f} -> {mh['sharpe']:.2f} (>={raw['sharpe']*0.90:.2f}) -> {'PASS' if sharpe_preserved else 'FAIL'}")
         print(f"  Overall Step 9:     {'PASS' if (dd_improved and sharpe_preserved) else 'NEEDS REVIEW'}")
+
+    # ---- Conditional Weighting Diagnostics ----
+    cw_summary = results.get("conditional_weighting_summary", {})
+    if cw_summary:
+        print(f"\n--- Conditional Weighting Layer ---")
+        print(f"  {'Posture':<15s} {'Count':>6s} {'FavScore':>10s} {'S1 Boost':>10s} {'Adj S1':>10s} {'Adj S2':>10s} {'Adj S3':>10s}")
+        for posture in ["aggressive", "balanced", "defensive"]:
+            if posture in cw_summary:
+                s = cw_summary[posture]
+                print(
+                    f"  {posture:<15s} {s['count']:>6d} "
+                    f"{s['mean_favorable_score']:>10.3f} "
+                    f"{s['mean_s1_boost']:>10.3f} "
+                    f"{s['mean_adj_s1']:>9.1%} "
+                    f"{s['mean_adj_s2']:>9.1%} "
+                    f"{s['mean_adj_s3']:>9.1%}"
+                )
+
+        # Overall dispersion check
+        cw_diag = results.get("conditional_weighting_diagnostics", pd.DataFrame())
+        if not cw_diag.empty:
+            print(f"\n  Overall S1 allocation: {cw_diag['adjusted_s1'].mean():.1%} "
+                  f"+/- {cw_diag['adjusted_s1'].std():.1%} "
+                  f"(base: {cw_diag['base_s1'].mean():.1%})")
+            print(f"  Favorable score:       {cw_diag['favorable_score'].mean():.3f} "
+                  f"+/- {cw_diag['favorable_score'].std():.3f} "
+                  f"[{cw_diag['favorable_score'].min():.3f} — {cw_diag['favorable_score'].max():.3f}]")

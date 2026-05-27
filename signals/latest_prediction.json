@@ -1,7 +1,10 @@
 {
-  "generated_at": "2026-05-26T21:55:20.423658+00:00",
+  "generated_at": "2026-05-27T06:09:24.547897+00:00",
   "forecast_date": "2026-05-26",
   "state_assessment": {
+    "volatility_regime": "normal_vol",
+    "realized_vol_10d": 0.1098,
+    "trend_strength": 0.9,
     "hmm_dominant_regime": "Unknown",
     "macro_conditions": "flat_curve"
   },
@@ -37,44 +40,44 @@
     "tightening_level": 0.412,
     "circuit_breaker": "none",
     "crash_momentum": false,
-    "strategic_posture": "balanced",
-    "leverage_ceiling": 0.95,
+    "strategic_posture": "aggressive",
+    "leverage_ceiling": 1.15,
     "fast_layer_override": false
   },
   "portfolio": {
     "selected_assets": [
       "SHY",
       "SPY",
-      "XLF",
-      "QQQ",
       "XLK",
-      "IWM",
-      "XLE",
-      "VWO",
+      "XLF",
       "SMH",
-      "GLD",
+      "QQQ",
       "AMZN",
-      "CAT"
+      "CAT",
+      "XLC",
+      "IWM",
+      "XLU",
+      "XLRE"
     ],
     "weights": {
-      "SHY": 0.3485,
-      "SPY": 0.1025,
-      "XLF": 0.0786,
-      "QQQ": 0.0707,
-      "XLK": 0.0707,
-      "IWM": 0.0617,
-      "XLE": 0.0505,
-      "VWO": 0.0488,
-      "SMH": 0.0459,
-      "GLD": 0.0449,
-      "AMZN": 0.0397,
-      "CAT": 0.0377
+      "SHY": 0.2633,
+      "SPY": 0.1045,
+      "XLK": 0.0776,
+      "XLF": 0.0731,
+      "SMH": 0.0729,
+      "QQQ": 0.0677,
+      "AMZN": 0.063,
+      "CAT": 0.0598,
+      "XLC": 0.0595,
+      "IWM": 0.0564,
+      "XLU": 0.0561,
+      "XLRE": 0.0462
     },
     "n_assets": 12,
     "upro_weight": 0,
-    "shy_weight": 0.3485,
+    "shy_weight": 0.2633,
     "tlt_weight": 0,
-    "gld_weight": 0.0449
+    "gld_weight": 0
   },
   "attribution": {
     "regime_allocator_contribution": "35%",

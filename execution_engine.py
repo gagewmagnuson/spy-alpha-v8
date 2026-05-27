@@ -325,38 +325,14 @@ class AlpacaExecutor:
             notional = abs(delta["delta_value"])
 
             try:
-                # Try notional order first, fall back to qty-based
-                try:
-                    order = self.api.submit_order(
-                        symbol=symbol,
-                        notional=round(notional, 2),
-                        side=side,
-                        type="market",
-                        time_in_force="day",
-                    )
-                except TypeError:
-                    # Older SDK versions don't support notional — use qty
-                    try:
-                        price = float(self.api.get_latest_trade(symbol).price)
-                        qty = int(notional / price)
-                        if qty < 1:
-                            logger.warning(f"  Skipping {symbol}: qty would be 0")
-                            results.append({
-                                "symbol": symbol,
-                                "side": side,
-                                "notional": notional,
-                                "skipped": True,
-                            })
-                            continue
-                        order = self.api.submit_order(
-                            symbol=symbol,
-                            qty=qty,
-                            side=side,
-                            type="market",
-                            time_in_force="day",
-                        )
-                    except Exception as e2:
-                        raise e2
+                # Notional order (preferred — handles fractional shares)
+                order = self.api.submit_order(
+                    symbol=symbol,
+                    notional=round(notional, 2),
+                    side=side,
+                    type="market",
+                    time_in_force="day",
+                )
 
                 results.append({
                     "symbol": symbol,
@@ -372,12 +348,15 @@ class AlpacaExecutor:
                 )
 
             except Exception as e:
-                logger.error(f"  Order failed for {symbol}: {e}")
+                logger.error(
+                    f"  Order failed: {symbol} {side} ${notional:.2f} "
+                    f"{type(e).__name__}: {e}"
+                )
                 results.append({
                     "symbol": symbol,
                     "side": side,
                     "notional": notional,
-                    "error": str(e),
+                    "error": f"{type(e).__name__}: {e}",
                 })
 
         return results

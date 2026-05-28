@@ -569,9 +569,18 @@ def run_daily(
     # ---- Get risk metadata from coordinator's last engine run ----
     risk_meta = mh_meta.get("risk_engine", {})
 
+    # ---- Use conditional-weighted capital allocations for attribution ----
+    cw = mh_meta.get("conditional_weighting", {})
+    if cw:
+        allocator_weights = {
+            "regime_allocator": cw.get("adjusted_s1", allocator_weights.get("regime_allocator", 0.35)),
+            "trend_cta": cw.get("adjusted_s2", allocator_weights.get("trend_cta", 0.35)),
+            "defensive": cw.get("adjusted_s3", allocator_weights.get("defensive", 0.30)),
+        }
+
     # ---- Build signal with attribution ----
     latest_state = state.iloc[-1]
- 
+
     signal = build_daily_signal(
         date=current_date,
         final_weights=final_weights,

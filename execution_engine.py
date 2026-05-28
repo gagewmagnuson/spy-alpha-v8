@@ -323,29 +323,36 @@ class AlpacaExecutor:
             symbol = delta["symbol"]
             side = delta["side"]
             notional = abs(delta["delta_value"])
+            target_weight = delta.get("target_weight", None)
 
             try:
-                # Notional order (preferred — handles fractional shares)
-                order = self.api.submit_order(
-                    symbol=symbol,
-                    notional=round(notional, 2),
-                    side=side,
-                    type="market",
-                    time_in_force="day",
-                )
+                # Full exit: use close_position to avoid fractional share mismatches
+                if side == "sell" and target_weight is not None and target_weight < 0.001:
+                    order = self.api.close_position(symbol)
+                    logger.info(
+                        f"  Position closed: {symbol} (full exit)"
+                    )
+                else:
+                    # Notional order (preferred — handles fractional shares)
+                    order = self.api.submit_order(
+                        symbol=symbol,
+                        notional=round(notional, 2),
+                        side=side,
+                        type="market",
+                        time_in_force="day",
+                    )
+                    logger.info(
+                        f"  Order submitted: {side.upper()} ${notional:,.2f} of {symbol} "
+                        f"(id: {order.id})"
+                    )
 
                 results.append({
                     "symbol": symbol,
                     "side": side,
                     "notional": notional,
-                    "order_id": order.id,
-                    "status": order.status,
+                    "order_id": order.id if hasattr(order, 'id') else str(order),
+                    "status": order.status if hasattr(order, 'status') else "closed",
                 })
-
-                logger.info(
-                    f"  Order submitted: {side.upper()} ${notional:,.2f} of {symbol} "
-                    f"(id: {order.id})"
-                )
 
             except Exception as e:
                 logger.error(

@@ -311,68 +311,118 @@ class PredictionTracker:
         logger.info(f"Signal saved to {path}")
         return path
  
+    # Canonical column order for prediction history
+    HISTORY_COLUMNS = [
+        "date", "generated_at",
+        # State assessment
+        "state_volatility_regime", "state_realized_vol_10d", "state_trend_strength",
+        "state_hmm_dominant_regime", "state_hmm_conviction", "state_macro_conditions",
+        "state_regime_entropy",
+        # Strategy signals
+        "strat_regime_allocator_activation", "strat_regime_allocator_confidence",
+        "strat_regime_allocator_n_active_assets", "strat_regime_allocator_regime_call",
+        "strat_regime_allocator_top_assets",
+        "strat_trend_cta_activation", "strat_trend_cta_confidence",
+        "strat_trend_cta_n_active_assets", "strat_trend_cta_trend_direction",
+        "strat_trend_cta_assets_in_uptrend",
+        "strat_defensive_activation", "strat_defensive_confidence",
+        "strat_defensive_n_active_assets", "strat_defensive_stress_score",
+        "strat_defensive_stress_activated",
+        # Risk modifications
+        "risk_uncertainty_score", "risk_tightening_level", "risk_circuit_breaker",
+        "risk_crash_momentum", "risk_strategic_posture", "risk_composite_score",
+        "risk_leverage_ceiling", "risk_fast_layer_override",
+        "risk_favorable_score", "risk_s1_boost",
+        "risk_adjusted_s1_weight", "risk_adjusted_s2_weight", "risk_adjusted_s3_weight",
+        "risk_stress_input",
+        # Portfolio
+        "n_assets", "upro_weight", "shy_weight", "tlt_weight", "gld_weight",
+        "top1_asset", "top1_weight", "top2_asset", "top2_weight",
+        "top3_asset", "top3_weight", "top4_asset", "top4_weight",
+        "top5_asset", "top5_weight",
+        # Attribution
+        "attr_regime_allocator_contribution", "attr_trend_cta_contribution",
+        "attr_defensive_contribution", "attr_risk_layer_modification",
+        "attr_uncertainty_reduction",
+        # Realized returns
+        "realized_spy_return", "realized_portfolio_return",
+    ]
+
     def append_to_history(
         self,
         signal: Dict[str, Any],
         realized_spy_return: Optional[float] = None,
         realized_portfolio_return: Optional[float] = None,
     ) -> None:
-        """Append a prediction record to the history CSV."""
+        """Append a prediction record to the history CSV with schema enforcement."""
         record = {
             "date": signal.get("forecast_date", ""),
             "generated_at": signal.get("generated_at", ""),
         }
- 
+
         # Flatten state assessment
         state = signal.get("state_assessment", {})
         for k, v in state.items():
             record[f"state_{k}"] = v
- 
+
         # Flatten strategy signals
         strategies = signal.get("strategy_signals", {})
         for name, sig in strategies.items():
             for k, v in sig.items():
                 record[f"strat_{name}_{k}"] = v
- 
+
         # Risk modifications
         risk = signal.get("risk_modifications", {})
         for k, v in risk.items():
             record[f"risk_{k}"] = v
- 
+
         # Portfolio
         portfolio = signal.get("portfolio", {})
         record["n_assets"] = portfolio.get("n_assets", 0)
         record["upro_weight"] = portfolio.get("upro_weight", 0)
         record["shy_weight"] = portfolio.get("shy_weight", 0)
- 
+        record["tlt_weight"] = portfolio.get("tlt_weight", 0)
+        record["gld_weight"] = portfolio.get("gld_weight", 0)
+
         # Top 5 weights
         weights = portfolio.get("weights", {})
         sorted_w = sorted(weights.items(), key=lambda x: -x[1])[:5]
         for i, (asset, w) in enumerate(sorted_w):
             record[f"top{i+1}_asset"] = asset
             record[f"top{i+1}_weight"] = w
- 
+
         # Attribution
         attribution = signal.get("attribution", {})
         for k, v in attribution.items():
             record[f"attr_{k}"] = v
- 
+
         # Realized returns (filled in later when available)
         record["realized_spy_return"] = realized_spy_return
         record["realized_portfolio_return"] = realized_portfolio_return
- 
-        # Append to CSV
-        df = pd.DataFrame([record])
+
+        # ---- Schema enforcement ----
+        # Ensure canonical column order and fill missing fields
+        enforced = {col: record.get(col, "") for col in self.HISTORY_COLUMNS}
+
+        # Duplicate date protection
+        if self.history_path.exists():
+            try:
+                existing = pd.read_csv(self.history_path)
+                date_val = enforced["date"]
+                generated = enforced["generated_at"]
+                if not existing.empty and date_val in existing["date"].values:
+                    # Keep only the latest entry per date
+                    existing = existing[existing["date"] != date_val]
+                    existing.to_csv(self.history_path, index=False)
+            except Exception:
+                pass  # If file is corrupt, just append
+
+        # Append with enforced schema
+        df = pd.DataFrame([enforced], columns=self.HISTORY_COLUMNS)
         if self.history_path.exists():
             df.to_csv(self.history_path, mode="a", header=False, index=False)
         else:
             df.to_csv(self.history_path, index=False)
- 
-    def load_history(self) -> pd.DataFrame:
-        """Load the full prediction history."""
-        if not self.history_path.exists():
-            return pd.DataFrame()
-        return pd.read_csv(self.history_path)
  
  
 # ---------------------------------------------------------------------------

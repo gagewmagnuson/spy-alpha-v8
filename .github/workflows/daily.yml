@@ -26,7 +26,7 @@ jobs:
       - name: Run daily pipeline
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python3 spy_alpha_v8.py --fred-key $FRED_API_KEY daily --snapshot baseline_v7
+        run: python3 spy_alpha_v8.py --fred-key $FRED_API_KEY daily --snapshot baseline_v7 --profile aggressive
 
       - name: Execute rebalance (paper trading)
         env:

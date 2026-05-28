@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-27T21:19:37.673677+00:00",
+  "generated_at": "2026-05-28T01:12:09.000881+00:00",
   "forecast_date": "2026-05-27",
   "state_assessment": {
     "hmm_dominant_regime": "Unknown",
@@ -38,15 +38,22 @@
     "circuit_breaker": "none",
     "crash_momentum": false,
     "strategic_posture": "balanced",
+    "composite_score": 0.493,
     "leverage_ceiling": 0.95,
-    "fast_layer_override": false
+    "fast_layer_override": false,
+    "favorable_score": 0.229,
+    "s1_boost": 0.126,
+    "adjusted_s1_weight": 0.459,
+    "adjusted_s2_weight": 0.27,
+    "adjusted_s3_weight": 0.27,
+    "stress_input": 0.21
   },
   "portfolio": {
     "selected_assets": [
       "SHY",
       "SPY",
-      "XLF",
       "XLK",
+      "XLF",
       "QQQ",
       "SMH",
       "IWM",
@@ -57,22 +64,22 @@
       "XLE"
     ],
     "weights": {
-      "SHY": 0.3401,
-      "SPY": 0.0987,
-      "XLF": 0.0716,
-      "XLK": 0.0712,
-      "QQQ": 0.0655,
-      "SMH": 0.0593,
-      "IWM": 0.0556,
-      "AMZN": 0.0513,
-      "CAT": 0.0487,
-      "XLC": 0.0484,
-      "XLU": 0.0457,
-      "XLE": 0.044
+      "SHY": 0.3275,
+      "SPY": 0.0988,
+      "XLK": 0.072,
+      "XLF": 0.0707,
+      "QQQ": 0.065,
+      "SMH": 0.0628,
+      "IWM": 0.0547,
+      "AMZN": 0.0543,
+      "CAT": 0.0516,
+      "XLC": 0.0513,
+      "XLU": 0.0483,
+      "XLE": 0.0429
     },
     "n_assets": 12,
     "upro_weight": 0,
-    "shy_weight": 0.3401,
+    "shy_weight": 0.3275,
     "tlt_weight": 0,
     "gld_weight": 0
   },

@@ -186,36 +186,49 @@ def _build_risk_modifications(
 ) -> Dict[str, Any]:
     """Build risk modification summary."""
     modifications = {}
- 
+
     # Uncertainty dampening
     modifications["uncertainty_score"] = round(
         float(risk_metadata.get("uncertainty_score", 0)), 3
     )
- 
+
     # Constraint tightening
     modifications["tightening_level"] = round(
         float(risk_metadata.get("tightening_level", 0)), 3
     )
- 
+
     # Circuit breaker
     breaker = risk_metadata.get("circuit_breaker", {})
     if isinstance(breaker, dict):
         modifications["circuit_breaker"] = breaker.get("circuit_breaker_level", "none")
         modifications["crash_momentum"] = breaker.get("crash_momentum_active", False)
- 
+
     # Multi-horizon layers
     slow = mh_metadata.get("slow_layer", {})
     fast = mh_metadata.get("fast_layer", {})
- 
+
     if isinstance(slow, dict):
         modifications["strategic_posture"] = slow.get("risk_posture", "unknown")
+        modifications["composite_score"] = round(
+            float(slow.get("composite_score", 0.5)), 3
+        )
         modifications["leverage_ceiling"] = round(
             float(slow.get("leverage_ceiling", 1.0)), 2
         )
- 
+
     if isinstance(fast, dict):
         modifications["fast_layer_override"] = fast.get("override_active", False)
- 
+
+    # Conditional weighting telemetry
+    cw = mh_metadata.get("conditional_weighting", {})
+    if cw:
+        modifications["favorable_score"] = round(float(cw.get("favorable_score", 0)), 3)
+        modifications["s1_boost"] = round(float(cw.get("s1_boost", 0)), 3)
+        modifications["adjusted_s1_weight"] = round(float(cw.get("adjusted_s1", 0)), 3)
+        modifications["adjusted_s2_weight"] = round(float(cw.get("adjusted_s2", 0)), 3)
+        modifications["adjusted_s3_weight"] = round(float(cw.get("adjusted_s3", 0)), 3)
+        modifications["stress_input"] = round(float(cw.get("stress", 0)), 3)
+
     return modifications
  
  

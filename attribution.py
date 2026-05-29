@@ -420,7 +420,18 @@ class PredictionTracker:
         # Append with enforced schema
         df = pd.DataFrame([enforced], columns=self.HISTORY_COLUMNS)
         if self.history_path.exists():
-            df.to_csv(self.history_path, mode="a", header=False, index=False)
+            try:
+                existing_cols = pd.read_csv(self.history_path, nrows=0).columns.tolist()
+                if existing_cols != self.HISTORY_COLUMNS:
+                    # Schema mismatch — rewrite with correct headers
+                    existing = pd.read_csv(self.history_path)
+                    existing = existing.reindex(columns=self.HISTORY_COLUMNS)
+                    full = pd.concat([existing, df], ignore_index=True)
+                    full.to_csv(self.history_path, index=False)
+                else:
+                    df.to_csv(self.history_path, mode="a", header=False, index=False)
+            except Exception:
+                df.to_csv(self.history_path, mode="a", header=False, index=False)
         else:
             df.to_csv(self.history_path, index=False)
  

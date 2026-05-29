@@ -1,13 +1,16 @@
 {
-  "generated_at": "2026-05-28T21:19:03.886317+00:00",
+  "generated_at": "2026-05-29T21:19:10.797342+00:00",
   "forecast_date": "2026-05-28",
   "state_assessment": {
+    "volatility_regime": "normal_vol",
+    "realized_vol_10d": 0.1088,
+    "trend_strength": 0.9,
     "hmm_dominant_regime": "Unknown",
     "macro_conditions": "flat_curve"
   },
   "strategy_signals": {
     "regime_allocator": {
-      "activation": 0.458,
+      "activation": 0.535,
       "confidence": 0.575,
       "n_active_assets": 20,
       "regime_call": "Crisis-Inflation",
@@ -18,14 +21,14 @@
       ]
     },
     "trend_cta": {
-      "activation": 0.271,
+      "activation": 0.233,
       "confidence": 0.727,
       "n_active_assets": 8,
       "trend_direction": "bullish",
       "assets_in_uptrend": 8
     },
     "defensive": {
-      "activation": 0.271,
+      "activation": 0.233,
       "confidence": 0.1,
       "n_active_assets": 3,
       "stress_score": 0.211,
@@ -37,56 +40,56 @@
     "tightening_level": 0.412,
     "circuit_breaker": "none",
     "crash_momentum": false,
-    "strategic_posture": "balanced",
-    "composite_score": 0.487,
-    "leverage_ceiling": 0.94,
+    "strategic_posture": "aggressive",
+    "composite_score": 0.788,
+    "leverage_ceiling": 1.15,
     "fast_layer_override": false,
-    "favorable_score": 0.226,
-    "s1_boost": 0.124,
-    "adjusted_s1_weight": 0.458,
-    "adjusted_s2_weight": 0.271,
-    "adjusted_s3_weight": 0.271,
+    "favorable_score": 0.366,
+    "s1_boost": 0.201,
+    "adjusted_s1_weight": 0.535,
+    "adjusted_s2_weight": 0.233,
+    "adjusted_s3_weight": 0.233,
     "stress_input": 0.21
   },
   "portfolio": {
     "selected_assets": [
       "SHY",
       "SPY",
+      "SMH",
       "XLK",
       "XLF",
-      "QQQ",
-      "SMH",
-      "IWM",
       "AMZN",
+      "QQQ",
       "CAT",
       "XLC",
       "XLU",
-      "XLE"
+      "IWM",
+      "XLRE"
     ],
     "weights": {
-      "SHY": 0.3284,
-      "SPY": 0.0989,
-      "XLK": 0.072,
-      "XLF": 0.0708,
-      "QQQ": 0.065,
-      "SMH": 0.0626,
-      "IWM": 0.0548,
-      "AMZN": 0.0541,
-      "CAT": 0.0513,
-      "XLC": 0.051,
-      "XLU": 0.0481,
-      "XLE": 0.043
+      "SHY": 0.2192,
+      "SPY": 0.107,
+      "SMH": 0.0807,
+      "XLK": 0.0807,
+      "XLF": 0.0731,
+      "AMZN": 0.0698,
+      "QQQ": 0.0682,
+      "CAT": 0.0663,
+      "XLC": 0.0659,
+      "XLU": 0.0621,
+      "IWM": 0.056,
+      "XLRE": 0.0511
     },
     "n_assets": 12,
     "upro_weight": 0,
-    "shy_weight": 0.3284,
+    "shy_weight": 0.2192,
     "tlt_weight": 0,
     "gld_weight": 0
   },
   "attribution": {
-    "regime_allocator_contribution": "46%",
-    "trend_cta_contribution": "27%",
-    "defensive_contribution": "27%",
+    "regime_allocator_contribution": "53%",
+    "trend_cta_contribution": "23%",
+    "defensive_contribution": "23%",
     "risk_layer_modification": "-2%",
     "uncertainty_reduction": "-1%"
   }
